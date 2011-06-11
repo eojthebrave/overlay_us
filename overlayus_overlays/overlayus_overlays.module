@@ -1,0 +1,111 @@
+<?php
+/**
+ * @file
+ * Code for the Overlay.Us Overlays feature.
+ */
+
+include_once('overlayus_overlays.features.inc');
+
+/**
+ * Implements hook_menu().
+ */
+function overlayus_overlays_menu() {
+  $items = array();
+  $items['n/%node'] = array(
+    'title' => 'Overlay',
+    'title callback' => 'overlayus_overlays_title_callback',
+    'title arguments' => array(1),
+    'page callback' => 'overlayus_overlays_callback',
+    'page arguments' => array(1),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+function overlayus_overlays_title_callback($node) {
+  return check_plain($node->title);
+}
+
+function overlayus_overlays_callback($node) {
+  if ($node->type != 'overlay') {
+    drupal_not_found();
+  }
+
+  // Construct the URL of the site that we are going to impose an overlay on.
+  $path = func_get_args();
+  // First element is the node object which we don't need to construct the
+  // path.
+  array_shift($path);
+  if ($path[0] == 'http:' || $path[0] == 'https:') {
+    // Drupal strips out the '//' from paths because it's trying to seperate
+    // them into arguments. We need them however.
+    $path[1] = '//';
+  }
+
+  $url = '';
+  foreach ($path as $p) {
+    // Again, dealing with Drupal stripping out the '/' character.
+    if (empty($p)) {
+      $p = '/';
+    }
+    $url .= $p;
+  }
+
+  if (empty($url)) {
+    drupal_not_found();
+  }
+
+  $output = overlayus_overlays_build_overlay($url, $node);
+
+  // We render this out manually rather than returning the renderable array
+  // so that we can skip rendering all of the regions/blocks/etc on the page
+  // that are not used for overlays.
+  print drupal_render($output);
+  module_invoke_all('exit');
+  exit;
+}
+
+/**
+ *
+ *
+ * @param $url
+ *   URL of the site to overlay. For example http://example.com.
+ */
+function overlayus_overlays_build_overlay($url, $node) {
+  $build = array();
+
+  $build['page'] = array(
+    '#theme_wrappers' => array('html'),
+  );
+
+  $build['page']['frame'] = array(
+    '#markup' => '<iframe scrolling="no" src="'. url($url) . '" id="overlayus"></iframe>',
+    '#attached' => array(
+      'css' => array(
+        drupal_get_path('module', 'overlayus_overlays') . '/overlayus_overlays.css',
+      ),
+      'js' => array(
+        drupal_get_path('module', 'overlayus_overlays') . '/overlayus_overlays.js',
+      ),
+    ),
+  );
+
+  $build['page']['overlay'] = array(
+    '#theme' => 'image',
+    '#path' => $node->field_overlay_image[und][0]['uri'],
+    '#prefix' => '<div id="overlayus-element">',
+    '#suffix' => '</div>'
+  );
+
+  if (node_access('update', $node)) {
+    // @todo - this should be a renderable.
+    $build['page']['tools'] = array(
+      '#markup' => l(t('edit'), 'node/' . $node->nid . '/edit'),
+      '#prefix' => '<div id="overlayus-tools">',
+      '#suffix' => '</div>',
+    );
+  }
+
+  return $build;
+}
