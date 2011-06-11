@@ -16,3 +16,6 @@ projects[features][subdir] = contrib
 projects[views] = 7.x
 projects[views][subdir] = contrib
 
+
+projects[ctools] = 7.x-1.0-beta1
+projects[ctools][subdir] = contrib
